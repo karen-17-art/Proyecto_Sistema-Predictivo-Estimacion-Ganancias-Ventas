@@ -16,12 +16,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeRegressor
 
 # =====================================================
-# ENLACE DE LA DATA
+# ENLACE DE LA DATA - cambair enlace 
 # =====================================================
 
 url = "https://docs.google.com/spreadsheets/d/1KypSiIv_hXmbkUPzkkcg0Zdrz2PrUFXSnJtV6R2JnDg/export?format=csv"
 
-# =====================================================
 # CARGAR DATA
 # =====================================================
 
