@@ -22,6 +22,7 @@ st.set_page_config(
 )
 
 st.title("📊 Sistema Predictivo de Ganancia por Venta")
+st.write("Modelo con reglas de negocio para evitar resultados irreales.")
 
 # =====================================================
 # DATA
@@ -194,23 +195,24 @@ if st.button("🔮 Predecir Ganancia"):
 
     pred = model.predict(input_data)[0]
 
+    ingreso = ingreso_bruto
+    descuento = impacto_descuento
+
     # =================================================
-    # 🔥 REGLAS DE NEGOCIO (CORRECCIÓN CLAVE)
+    # 🔥 REGLAS DE NEGOCIO (CLAVE FINAL)
     # =================================================
 
-    ingreso = ingreso_bruto
+    ingreso_neto_real = ingreso - descuento
 
     ganancia = max(0, pred)
 
-    # ❗ NO puede ser mayor al ingreso
-    ganancia = min(ganancia, ingreso * 0.95)
+    # ❗ NO puede superar ingreso neto
+    ganancia = min(ganancia, ingreso_neto_real * 0.95)
 
-    descuento = impacto_descuento
-
-    # rentabilidad coherente
+    # rentabilidad correcta
     rentabilidad = (ganancia / ingreso) * 100
 
-    # límites realistas
+    # evitar extremos
     rentabilidad = np.clip(rentabilidad, 1, 80)
 
     # =================================================
@@ -240,7 +242,7 @@ if st.button("🔮 Predecir Ganancia"):
     fig, ax = plt.subplots()
 
     ax.bar(
-        ["Ingreso", "Descuento", "Ganancia"],
+        ["Ingreso Bruto", "Descuento", "Ganancia"],
         [ingreso, descuento, ganancia]
     )
 
