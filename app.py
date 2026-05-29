@@ -21,8 +21,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📊 Sistema Predictivo de Ganancia por Venta")
-st.write("Modelo con reglas de negocio para evitar resultados irreales.")
+st.title("📊 Sistema Predictivo de Ganancia por Venta (REALISTA)")
 
 # =====================================================
 # DATA
@@ -35,15 +34,7 @@ data = pd.read_csv(url)
 # LIMPIEZA
 # =====================================================
 
-data["ganancia_total"] = (
-    data["ganancia_total"]
-    .astype(str)
-    .str.replace(",", ".")
-    .str.replace("%", "")
-)
-
 data["ganancia_total"] = pd.to_numeric(data["ganancia_total"], errors="coerce")
-
 data["n_productos"] = pd.to_numeric(data["n_productos"], errors="coerce")
 data["precio_promedio"] = pd.to_numeric(data["precio_promedio"], errors="coerce")
 data["desc_promedio"] = pd.to_numeric(data["desc_promedio"], errors="coerce")
@@ -54,17 +45,16 @@ data = data.dropna()
 data = data[(data["desc_promedio"] >= 0) & (data["desc_promedio"] <= 1)]
 
 # =====================================================
-# FEATURE ENGINEERING
+# FEATURE ENGINEERING (IMPORTANTE)
 # =====================================================
 
+# SOLO variable de negocio real (NO fuga de info)
+data["costo_estimado"] = data["n_productos"] * data["precio_promedio"] * 0.65
+
+# log estabilidad
 data["log_productos"] = np.log1p(data["n_productos"])
 
-data["ingreso_bruto"] = data["n_productos"] * data["precio_promedio"]
-
-data["impacto_descuento"] = data["ingreso_bruto"] * data["desc_promedio"]
-
-data["ingreso_neto"] = data["ingreso_bruto"] - data["impacto_descuento"]
-
+# campaña a numérico
 data["en_campana"] = data["en_campana"].map({
     "True": 1,
     "False": 0,
@@ -79,16 +69,15 @@ data["en_campana"] = data["en_campana"].map({
 y = data["ganancia_total"]
 
 # =====================================================
-# FEATURES
+# FEATURES (IMPORTANTE: SIN INGRESO NI GANANCIA DERIVADA)
 # =====================================================
 
 features = [
     "log_productos",
+    "n_productos",
     "precio_promedio",
     "desc_promedio",
-    "ingreso_bruto",
-    "impacto_descuento",
-    "ingreso_neto",
+    "costo_estimado",
     "en_campana",
     "channel",
     "categoria_principal",
@@ -115,10 +104,9 @@ X_train, X_test, y_train, y_test = train_test_split(
 # =====================================================
 
 model = RandomForestRegressor(
-    n_estimators=400,
-    max_depth=15,
-    min_samples_split=4,
-    min_samples_leaf=2,
+    n_estimators=300,
+    max_depth=12,
+    min_samples_leaf=3,
     random_state=42,
     n_jobs=-1
 )
@@ -164,19 +152,15 @@ with col2:
 # FEATURES INPUT
 # =====================================================
 
+costo_estimado = n_productos * precio_promedio * 0.65
 log_productos = np.log1p(n_productos)
-
-ingreso_bruto = n_productos * precio_promedio
-impacto_descuento = ingreso_bruto * desc_promedio
-ingreso_neto = ingreso_bruto - impacto_descuento
 
 input_data = pd.DataFrame([{
     "log_productos": log_productos,
+    "n_productos": n_productos,
     "precio_promedio": precio_promedio,
     "desc_promedio": desc_promedio,
-    "ingreso_bruto": ingreso_bruto,
-    "impacto_descuento": impacto_descuento,
-    "ingreso_neto": ingreso_neto,
+    "costo_estimado": costo_estimado,
     "en_campana": en_campana,
     "channel": channel,
     "categoria_principal": categoria_principal,
@@ -195,24 +179,16 @@ if st.button("🔮 Predecir Ganancia"):
 
     pred = model.predict(input_data)[0]
 
-    ingreso = ingreso_bruto
-    descuento = impacto_descuento
-
-    # =================================================
-    # 🔥 REGLAS DE NEGOCIO (CLAVE FINAL)
-    # =================================================
-
-    ingreso_neto_real = ingreso - descuento
+    ingreso_bruto = n_productos * precio_promedio
+    descuento = ingreso_bruto * desc_promedio
+    ingreso_neto = ingreso_bruto - descuento
 
     ganancia = max(0, pred)
 
-    # ❗ NO puede superar ingreso neto
-    ganancia = min(ganancia, ingreso_neto_real * 0.95)
+    # 🔥 REGLA DE NEGOCIO REAL
+    ganancia = min(ganancia, ingreso_neto * 0.9)
 
-    # rentabilidad correcta
-    rentabilidad = (ganancia / ingreso) * 100
-
-    # evitar extremos
+    rentabilidad = (ganancia / ingreso_bruto) * 100
     rentabilidad = np.clip(rentabilidad, 1, 80)
 
     # =================================================
@@ -222,7 +198,7 @@ if st.button("🔮 Predecir Ganancia"):
     st.subheader("📊 Resultado de la Venta")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("💰 Ingreso Bruto", f"S/ {ingreso:,.2f}")
+    c1.metric("💰 Ingreso Bruto", f"S/ {ingreso_bruto:,.2f}")
     c2.metric("🏷️ Descuento", f"S/ {descuento:,.2f}")
     c3.metric("📈 Ganancia", f"S/ {ganancia:,.2f}")
 
@@ -240,12 +216,10 @@ if st.button("🔮 Predecir Ganancia"):
     # =================================================
 
     fig, ax = plt.subplots()
-
     ax.bar(
-        ["Ingreso Bruto", "Descuento", "Ganancia"],
-        [ingreso, descuento, ganancia]
+        ["Ingreso", "Descuento", "Ganancia"],
+        [ingreso_bruto, descuento, ganancia]
     )
-
     ax.set_title("📊 Análisis de Venta")
 
     st.pyplot(fig)
